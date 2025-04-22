@@ -5,6 +5,18 @@ date: "2025-04-21"
 output: html_document
 ---
 
+# libraries
+
+```{r}
+library(tidyverse)
+library(caret)
+library(fastDummies)
+library(skimr)
+library(VGAM)
+library(xgboost)
+```
+
+
 
 # Profit Function
 
@@ -60,6 +72,8 @@ profit <- fast %>% f_profit()
 fast <- fast %>% engineer()
 fast <- fast |> select(1:7) 
 fast["Profit"] = profit
+grid = expand.grid(nrounds = c(10,20), lambda= c(0.1), alpha = c(1), eta = c(0.1))
+train(Profit ~  ., data = fast, method = "xgbLinear", tuneGrid = grid, gamma = 0.5)$results$RMSE[2]
 train(Profit ~ .,
       data = fast, 
       method = "lm",
