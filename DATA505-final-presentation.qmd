@@ -1,0 +1,169 @@
+---
+title: "DATA505 Final Model"
+subtitle: "skadoo"
+author: "Kaiona Apio & Jeffrey Smith"
+format: revealjs
+editor: visual
+from: markdown+emoji
+embed-resources: true
+---
+
+
+```{r, message=FALSE,echo=FALSE,warning=FALSE,results=FALSE}
+library(tidyverse)
+library(caret)
+library(fastDummies)
+library(skimr)
+library(VGAM)
+fast <- readRDS(gzcon(url("https://github.com/cd-public/D505/raw/refs/heads/master/dat/craven_train.rds")))
+profit = fast["Revenue 2019 to present"] - fast["BOM Cost"] * fast["Units Sold"]
+fast["Profit"] = profit["Revenue 2019 to present"]
+fast = fast %>%
+  drop_na(.) %>%
+  select(-`src_Amazon FBM`, -`Sales Channel`, -`First Order (from sales data)`) %>%
+  mutate(across(src_www:`pct_R&D Club`, ~ sub("%", "", .x))) %>%
+  type.convert(as.is = TRUE)
+mynorm = function(x) {
+  xnorm = (x - mean(x))/sd(x)
+  return(xnorm)
+}
+set.seed(505)
+```
+
+## Principle Component Analysis 🐡
+
+-   For simple EDA, we ran PCA to find some starting relevant features
+    -   Based on the table of Principle Components, we chose the the first few features to look at, being the `Main Component Material`, the  `Main Componenet MFG Process`, and the `Main Component Finishing Process`.
+    -   These can be seen as a proxy for the quality of the product, as higher quality products will most likely use better materials and processes in their production.
+
+## Main Component Material
+
+-   Based on the distributions of the main material used in each product, Aluminum and Steel had the most products in the higher profit range.
+
+```{r,message=FALSE,echo=FALSE,warning=FALSE}
+matplot = fast %>%
+  filter(`Main Component Material` %in% c("Aluminum", "Steel")) %>%
+  ggplot(aes(x = Profit)) + 
+  geom_histogram() + 
+  facet_wrap(.~`Main Component Material`) + 
+  theme_bw()
+print(matplot)
+```
+
+## Main Component MFG Process
+
+-   The manufacturing processes that most consistently saw products in the higher profit range were the Lathe and Form processes, so an indicator for these processes was included in the model.
+
+```{r,message=FALSE,echo=FALSE,warning=FALSE}
+mfgplot = fast %>%
+  filter(`Main Component MFG Process` %in% c("Lathe", "Form")) %>%
+  ggplot(aes(x = Profit)) + 
+  geom_histogram() + 
+  facet_wrap(.~`Main Component MFG Process`) + 
+  theme_bw()
+print(mfgplot)
+```
+
+## Main Component Finishing Process
+
+-   Only one finishing process had consistent products with higher profits, so an indicator for that process `Powder` was included.
+
+```{r,message=FALSE,echo=FALSE,warning=FALSE}
+finplot = fast %>%
+  #filter(`Main Component Finishing Process` %in% c("Powder")) %>%
+  ggplot(aes(x = Profit)) + 
+  geom_histogram() + 
+  facet_wrap(.~`Main Component Finishing Process`) + 
+  theme_bw()
+print(finplot)
+```
+
+## Concerning Orders
+
+-   The order method for products with high profits consistently included either Direct Orders and Orders from Stock, so the addition of these two percentages was included in the model.
+
+```{r,message=FALSE,echo=FALSE,warning=FALSE}
+theyear = fast %>%
+  mutate(across(January:December, ~ ifelse(.x > 0, 1, 0))) %>%
+  select(January:December)
+Consistency = rowSums(theyear)
+fast8 = fast %>%
+  mutate(MoneyDiff = retailPrice - `BOM Cost`) %>%
+  mutate(mat = `Main Component Material` %in% c("Aluminum", "Steel")) %>%
+  mutate(mfgp = `Main Component MFG Process` %in% c("Lathe", "Form")) %>%
+  mutate(fin = `Main Component Finishing Process` %in% c("Powder")) %>%
+  mutate(theorder = `pct_Direct Sales` + `pct_Orders for Stock`) %>%
+  select(mfgp, fin, mat, theorder, MoneyDiff, `Units Sold`, Profit) 
+fast8 = cbind(fast8, Consistency)
+fast8 = fast8 %>%
+  mutate(theorder = mynorm(theorder),
+         Consistency = mynorm(Consistency), 
+         MoneyDiff = mynorm(MoneyDiff),
+         `Units Sold` = mynorm(`Units Sold`))
+ggplot(data = fast8, aes(x = theorder, y = Profit)) + geom_point() + theme_bw() + xlim(0,1)
+```
+
+
+## Sales Throughout the Year
+
+-   More profitable products are sold more consistently throughout the year, hence the creation of the `Consistency` feature.
+-   `Consistency` feature is a sum of the number of months where a product was sold, i.e. if a product had a nonzero percentage of sales in months June, July, and August, the `Consistency` feature for that product would be $3$.
+
+## Price and Sales
+
+ -   Added in this model are the features relating to the different between the retail price of the item and the BOM cost, as well as how many units of each product were sold.
+ 
+```{r,message=FALSE,echo=FALSE,warning=FALSE}
+theyear = fast %>%
+  mutate(across(January:December, ~ ifelse(.x > 0, 1, 0))) %>%
+  select(January:December)
+Consistency = rowSums(theyear)
+fast8 = fast %>%
+  mutate(MoneyDiff = retailPrice - `BOM Cost`) %>%
+  mutate(mat = `Main Component Material` %in% c("Aluminum", "Steel")) %>%
+  mutate(mfgp = `Main Component MFG Process` %in% c("Lathe", "Form")) %>%
+  mutate(fin = `Main Component Finishing Process` %in% c("Powder")) %>%
+  mutate(theorder = `pct_Direct Sales` + `pct_Orders for Stock`) %>%
+  select(mfgp, fin, mat, theorder, MoneyDiff, `Units Sold`, Profit) 
+fast8 = cbind(fast8, Consistency)
+fast8 = fast8 %>%
+  mutate(theorder = mynorm(theorder),
+         Consistency = mynorm(Consistency), 
+         MoneyDiff = mynorm(MoneyDiff),
+         `Units Sold` = mynorm(`Units Sold`))
+ggplot(data = fast8, aes(x = `Units Sold`, y = Profit)) + geom_point() + theme_bw()
+```
+
+
+## Model Performance
+
+-   The model scored RMSE of around 1500, as shown below.
+-   Still has room for improvement.
+    
+```{r,message=FALSE,echo=FALSE,warning=FALSE}
+theyear = fast %>%
+  mutate(across(January:December, ~ ifelse(.x > 0, 1, 0))) %>%
+  select(January:December)
+Consistency = rowSums(theyear)
+fast8 = fast %>%
+  mutate(MoneyDiff = retailPrice - `BOM Cost`) %>%
+  mutate(mat = `Main Component Material` %in% c("Aluminum", "Steel")) %>%
+  mutate(mfgp = `Main Component MFG Process` %in% c("Lathe", "Form")) %>%
+  mutate(fin = `Main Component Finishing Process` %in% c("Powder")) %>%
+  mutate(theorder = `pct_Direct Sales` + `pct_Orders for Stock`) %>%
+  select(mfgp, fin, mat, theorder, MoneyDiff, `Units Sold`, Profit) 
+fast8 = cbind(fast8, Consistency)
+fast8 = fast8 %>%
+  mutate(theorder = mynorm(theorder),
+         Consistency = mynorm(Consistency), 
+         MoneyDiff = mynorm(MoneyDiff),
+         `Units Sold` = mynorm(`Units Sold`))
+set.seed(505)
+rmse8 = train(Profit ~ .,
+      data = fast8, 
+      method = "lm",
+      trControl = trainControl(method = "cv", number = 5))$results$RMSE
+rmse8 = round(rmse8, 4)
+print(paste("RMSE of Model:", rmse8))
+```
+

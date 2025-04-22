@@ -1,0 +1,71 @@
+---
+title: "Final Model Functions"
+author: "jys"
+date: "2025-04-21"
+output: html_document
+---
+
+
+# Profit Function
+
+```{r}
+f_profit = function(ds) {
+  vec = ds %>% drop_na(.) %>%
+    mutate(Profit = `Revenue 2019 to present` - `BOM Cost` * `Units Sold`) %>%
+    select(Profit)
+  return(vec)
+}
+```
+
+# Engineer Function
+
+```{r}
+engineer = function(ds) {
+  mynorm = function(x) {
+  xnorm = (x - mean(x))/sd(x)
+  return(xnorm)
+  }
+  newds = ds %>%
+  drop_na(.) %>%
+  select(-`src_Amazon FBM`, -`Sales Channel`, -`First Order (from sales data)`) %>%
+  mutate(across(src_www:`pct_R&D Club`, ~ sub("%", "", .x))) %>%
+  type.convert(as.is = TRUE)
+  theyear = newds %>%
+  mutate(across(January:December, ~ ifelse(.x > 0, 1, 0))) %>%
+  select(January:December)
+Consistency = rowSums(theyear)
+newds = newds %>%
+  mutate(MoneyDiff = retailPrice - `BOM Cost`) %>%
+  mutate(mat = `Main Component Material` %in% c("Aluminum", "Steel")) %>%
+  mutate(mfgp = `Main Component MFG Process` %in% c("Lathe", "Form")) %>%
+  mutate(fin = `Main Component Finishing Process` %in% c("Powder")) %>%
+  mutate(theorder = `pct_Direct Sales` + `pct_Orders for Stock`) %>%
+  select(mfgp, fin, mat, theorder, MoneyDiff, `Units Sold`) 
+newds = cbind(newds, Consistency)
+newds = newds %>%
+  mutate(theorder = mynorm(theorder),
+         Consistency = mynorm(Consistency), 
+         MoneyDiff = mynorm(MoneyDiff),
+         `Units Sold` = mynorm(`Units Sold`))
+
+return(newds)  
+}
+```
+
+# Test the Data, slightly altered version of yours
+
+```{r}
+fast <- readRDS(gzcon(url("https://github.com/cd-public/D505/raw/refs/heads/master/dat/craven_train.rds"))) # change this url to the holdout dataset
+profit <- fast %>% f_profit()
+fast <- fast %>% engineer()
+fast <- fast |> select(1:7) 
+fast["Profit"] = profit
+train(Profit ~ .,
+      data = fast, 
+      method = "lm",
+      trControl = trainControl(method = "cv", number = 5))$results$RMSE
+```
+
+
+
+
