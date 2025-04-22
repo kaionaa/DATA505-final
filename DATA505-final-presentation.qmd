@@ -1,8 +1,9 @@
 ---
 title: "DATA505 Final Model"
-subtitle: "skadoo"
+subtitle: "Grad students vs. 7 evil models"
 author: "Kaiona Apio & Jeffrey Smith"
 format: revealjs
+  theme: moon
 editor: visual
 from: markdown+emoji
 embed-resources: true
