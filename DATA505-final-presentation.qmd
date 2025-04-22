@@ -140,7 +140,7 @@ ggplot(data = fast8, aes(x = `Units Sold`, y = Profit)) + geom_point() + theme_b
 ## The Models
 
 -   Compared a linear model to XGBoost
--   XGBoost (or eXtreme Gradient Boosting) iteratively trains a bunch of shallow decision trees which ends on the sum of all decision trees.
+-   XGBoost (or eXtreme Gradient Boosting) trains a bunch of shallow decision trees in parallel which ends on the sum of all decision trees.
 -   Algorithm involves minimizing the loss function shown below using Taylor's theorem around the previous predicted value.
 $$
     L^{(t)} = \sum_{i=1}^{n}l(y_i, \hat{y}_i^{t-1} + f_t(x_i)) + \Omega(f_t)

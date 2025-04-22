@@ -1216,7 +1216,7 @@ Kaiona Apio &amp; Jeffrey Smith
 <h2>The Models</h2>
 <ul>
 <li>Compared a linear model to XGBoost</li>
-<li>XGBoost (or eXtreme Gradient Boosting) iteratively trains a bunch of shallow decision trees which ends on the sum of all decision trees.</li>
+<li>XGBoost (or eXtreme Gradient Boosting) trains a bunch of shallow decision trees in parallel which ends on the sum of all decision trees.</li>
 <li>Algorithm involves minimizing the loss function shown below using Taylor’s theorem around the previous predicted value. <span class="math display">\[
 L^{(t)} = \sum_{i=1}^{n}l(y_i, \hat{y}_i^{t-1} + f_t(x_i)) + \Omega(f_t)
 \]</span></li>
